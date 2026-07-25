@@ -2,6 +2,7 @@
  * ============================================================
  * MASOI AI
  * Artificial Intelligence Brain
+ * Version 1.0
  * ============================================================
  */
 
@@ -9,63 +10,175 @@ import { Memory } from "./Memory";
 import { Suspicion } from "./Suspicion";
 import { Personality } from "./Personality";
 
+export interface ChatMessage {
+
+    playerId: string;
+
+    playerName: string;
+
+    message: string;
+
+    time: Date;
+
+}
+
+export interface AIEvent {
+
+    type: string;
+
+    target?: string;
+
+    source?: string;
+
+    value?: number;
+
+    round?: number;
+
+}
+
 export class AIBrain {
 
     /**
-     * Thông tin AI
+     * ==========================
+     * Thông tin cơ bản
+     * ==========================
      */
 
     public id: string;
 
     public name: string;
 
-    /**
-     * Tính cách
-     */
-
     public personality: Personality;
 
     /**
-     * Trí nhớ
+     * ==========================
+     * Vai trò
+     * ==========================
+     */
+
+    public role: string = "";
+
+    public team: string = "";
+
+    /**
+     * ==========================
+     * Bộ nhớ
+     * ==========================
      */
 
     public memory: Memory;
 
     /**
+     * ==========================
      * Mức độ nghi ngờ
+     * ==========================
      */
 
     public suspicion: Suspicion;
 
     /**
-     * Người AI tin tưởng
+     * ==========================
+     * Người tin tưởng
+     * ==========================
      */
 
     public trustedPlayers: Set<string>;
 
     /**
-     * Người AI nghi ngờ
+     * ==========================
+     * Người nghi ngờ
+     * ==========================
      */
 
     public suspectedPlayers: Set<string>;
 
     /**
+     * ==========================
      * Lịch sử chat
+     * ==========================
      */
 
-    public chatHistory: string[];
+    public chatHistory: ChatMessage[];
 
     /**
+     * ==========================
+     * Lịch sử sự kiện
+     * ==========================
+     */
+
+    public events: AIEvent[];
+
+    /**
+     * ==========================
+     * Người đã chết
+     * ==========================
+     */
+
+    public deadPlayers: Set<string>;
+
+    /**
+     * ==========================
+     * Người còn sống
+     * ==========================
+     */
+
+    public alivePlayers: Set<string>;
+
+    /**
+     * ==========================
      * Mục tiêu hiện tại
+     * ==========================
      */
 
     public currentTarget: string | null;
 
     /**
-     * Constructor
+     * ==========================
+     * Người AI muốn bảo vệ
+     * ==========================
      */
 
-    constructor(id: string, name: string, personality: Personality) {
+    public protectTarget: string | null;
+
+    /**
+     * ==========================
+     * Người AI muốn cứu
+     * ==========================
+     */
+
+    public saveTarget: string | null;
+
+    /**
+     * ==========================
+     * Người AI muốn soi
+     * ==========================
+     */
+
+    public inspectTarget: string | null;
+
+    /**
+     * ==========================
+     * Người AI muốn giết
+     * ==========================
+     */
+
+    public killTarget: string | null;
+
+    /**
+     * ==========================
+     * Constructor
+     * ==========================
+     */
+
+    constructor(
+
+        id: string,
+
+        name: string,
+
+        personality: Personality
+
+    ) {
 
         this.id = id;
 
@@ -83,70 +196,184 @@ export class AIBrain {
 
         this.chatHistory = [];
 
+        this.events = [];
+
+        this.deadPlayers = new Set();
+
+        this.alivePlayers = new Set();
+
         this.currentTarget = null;
 
-    }
+        this.protectTarget = null;
 
-    /**
-     * Ghi nhớ tin nhắn
-     */
+        this.saveTarget = null;
 
-    public remember(message: string) {
+        this.inspectTarget = null;
 
-        this.memory.messages.push(message);
-
-        this.chatHistory.push(message);
+        this.killTarget = null;
 
     }
 
     /**
-     * Ghi sự kiện
+     * =====================================================
+     * Khởi tạo danh sách người chơi
+     * =====================================================
      */
 
-    public rememberEvent(event: string) {
+    public initializePlayers(
 
-        this.memory.events.push(event);
+        players: {
+
+            id: string;
+
+            name: string;
+
+        }[]
+
+    ) {
+
+        this.alivePlayers.clear();
+
+        for (const player of players) {
+
+            this.alivePlayers.add(player.id);
+
+            this.suspicion.set(player.id, 0);
+
+        }
 
     }
 
     /**
-     * Tin tưởng ai
+     * =====================================================
+     * Ghi nhớ chat
+     * =====================================================
      */
 
-    public trust(player: string) {
+    public rememberChat(
 
-        this.trustedPlayers.add(player);
+        playerId: string,
+
+        playerName: string,
+
+        message: string
+
+    ) {
+
+        this.chatHistory.push({
+
+            playerId,
+
+            playerName,
+
+            message,
+
+            time: new Date()
+
+        });
+
+        this.memory.messages.push(
+
+            `${playerName}: ${message}`
+
+        );
 
     }
 
     /**
-     * Nghi ngờ ai
+     * =====================================================
+     * Ghi nhớ sự kiện
+     * =====================================================
      */
 
-    public suspect(player: string) {
+    public rememberEvent(event: AIEvent) {
 
-        this.suspectedPlayers.add(player);
+        this.events.push(event);
+
+        this.memory.events.push(
+
+            JSON.stringify(event)
+
+        );
 
     }
 
     /**
-     * Quên nghi ngờ
+     * =====================================================
+     * Người chết
+     * =====================================================
      */
 
-    public clearSuspect(player: string) {
+    public playerDied(playerId: string) {
 
-        this.suspectedPlayers.delete(player);
+        this.deadPlayers.add(playerId);
+
+        this.alivePlayers.delete(playerId);
 
     }
 
     /**
-     * Quên tin tưởng
+     * =====================================================
+     * Người hồi sinh
+     * =====================================================
      */
 
-    public clearTrust(player: string) {
+    public revivePlayer(playerId: string) {
 
-        this.trustedPlayers.delete(player);
+        this.deadPlayers.delete(playerId);
+
+        this.alivePlayers.add(playerId);
 
     }
 
-}
+    /**
+     * =====================================================
+     * Tin tưởng
+     * =====================================================
+     */
+
+    public trust(playerId: string) {
+
+        this.trustedPlayers.add(playerId);
+
+    }
+
+    /**
+     * =====================================================
+     * Hủy tin tưởng
+     * =====================================================
+     */
+
+    public removeTrust(playerId: string) {
+
+        this.trustedPlayers.delete(playerId);
+
+    }
+
+    /**
+     * =====================================================
+     * Nghi ngờ
+     * =====================================================
+     */
+
+    public suspect(
+
+        playerId: string,
+
+        score: number = 10
+
+    ) {
+
+        this.suspectedPlayers.add(playerId);
+
+        const current = this.suspicion.get(playerId);
+
+        this.suspicion.set(
+
+            playerId,
+
+            current + score
+
+        );
+
+    }
